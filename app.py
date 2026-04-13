@@ -66,6 +66,10 @@ def play_audio_background(text):
         pygame.mixer.music.play()
     except Exception as e:
         print("Lỗi Audio:", e)
+        try:
+            st.toast("🔇 Mất kết nối Internet, không thể phát giọng nói!", icon="⚠️")
+        except:
+            pass
 
 model = load_yolo_model()
 
@@ -95,8 +99,19 @@ with col2:
 
 # ======= VÒNG LẶP QUÉT CAMERA CÓ CƠ CHẾ ĐỒNG THUẬN =======
 if st.session_state.camera_running and model is not None:
-    cap = cv2.VideoCapture(0)
-    
+    try:
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            st.toast("⚠️ Vui lòng cấp quyền Camera Browser hoặc cắm WebCam!", icon="⚠️")
+            st.session_state.camera_running = False
+            time.sleep(0.5)
+            st.rerun()
+    except Exception as e:
+        st.toast("⚠️ Lỗi truy cập Camera!", icon="⚠️")
+        st.session_state.camera_running = False
+        time.sleep(0.5)
+        st.rerun()
+        
     REQUIRED_FRAMES = 15  
     current_candidate = "" 
     consecutive_frames = 0 
@@ -153,7 +168,13 @@ if st.session_state.camera_running and model is not None:
                     
                     if current_candidate != st.session_state.last_detected:
                         # GỌI LOA CHẠY ẨN BẰNG LUỒNG (THREAD) RIÊNG ĐỂ KHÔNG BỊ GIẬT CAMERA
-                        threading.Thread(target=play_audio_background, args=(spoken_text,), daemon=True).start()
+                        audio_thread = threading.Thread(target=play_audio_background, args=(spoken_text,), daemon=True)
+                        try:
+                            from streamlit.runtime.scriptrunner import add_script_run_ctx
+                            add_script_run_ctx(audio_thread)
+                        except:
+                            pass
+                        audio_thread.start()
                         st.session_state.last_detected = current_candidate
             else:
                 consecutive_frames = 0 
